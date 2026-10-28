@@ -26,6 +26,14 @@ def read_int(path):
     except ValueError:
         return None
 
+def energy_delta(old, new, max_range):
+    """Return the energy used between two counter readings, handling one wrap."""
+    if old is None or new is None:
+        return None
+
+    if new >= old:
+        return new - old
+    return (max_range - old) + new
 
 def find_hwmon(name):
     """Return the hwmon folder (e.g. '/sys/class/hwmon/hwmon6') whose 'name' file equals `name`, or None."""
