@@ -1,6 +1,19 @@
-# Project A: component design (draft)
+# pnp-characterization: design (draft)
 
-Drafted 2026-10-28. Moves into the Project A repo's `DESIGN.md` once the repo exists.
+Drafted 2026-10-28. Work in progress: sections are added as decisions are made.
+
+## 1. Goal
+
+This project investigates how CPU power limits, AMD Curve Optimizer undervolting profiles, and GPU power caps affect performance, power consumption, energy efficiency, and temperature on a Ryzen 7 7800X3D and RX 9070 XT desktop running Linux, across CPU-bound, cache-sensitive, GPU, and AI inference workloads. It also explores whether machine learning can detect abnormal hardware behaviour, such as instability, thermal throttling, and sensor faults, from telemetry collected during experiments.
+
+### Research questions
+
+- **RQ1:** At what CPU power limit does performance per watt peak, and how does performance at that point compare with stock settings?
+- **RQ2:** Does Curve Optimizer undervolting improve sustained performance by reducing temperature, rather than merely reducing power consumption?
+- **RQ3:** How differently do CPU-bound, cache-sensitive, GPU, and AI inference workloads respond to the same power limit?
+- **RQ4:** Can unsupervised anomaly detection identify telemetry patterns associated with unstable undervolting, thermal throttling, or sensor faults before a crash or obvious failure?
+
+## 4. Architecture
 
 ```
    Configuration  →  Orchestrator  →  Workload driver  +  Telemetry sampler
