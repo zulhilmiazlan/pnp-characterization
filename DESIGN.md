@@ -75,6 +75,42 @@ Development machine and optional second platform: Lenovo ThinkPad (Intel Core i5
 | **Result store** | The unique run ID, configuration, machine snapshot, raw telemetry CSV, and workload result. | A persistent, immutable run directory containing all artefacts needed to reproduce the analysis and compare experiments later. |
 | **Analysis** | The saved run directories, raw telemetry, workload performance results, configuration, and comparison criteria. | Derived metrics such as average power, energy consumption, performance per watt, temperature behaviour, plus run-to-run variance per configuration and whether configurations are distinguishable (spread within a configuration smaller than the difference between configurations), presented as reports and plots, without modifying the original run data. |
 
+## 5. Experiment design
+
+### Factors and levels
+
+| Factor | Levels | How it is changed |
+|---|---|---|
+| CPU profile | Pilot: stock, Curve Optimizer −30, PPT 65 W | Selected by hand from saved BIOS profiles; one boot per profile |
+| Workload | Pilot: two CPU workloads from `stress-ng` (chosen when the workload driver is built). Later: GPU and AI inference workloads | Chosen by the run configuration and launched by the workload driver |
+| GPU power cap | Not in the CPU pilot. Levels to be defined downwards from the stock 304 W cap | Set by the framework through sysfs (`power1_cap`) |
+
+### Responses
+
+- Workload performance (the workload's own score or execution time) and exit status.
+- CPU package energy, average power and temperature.
+- GPU power and temperatures, when the workload uses the discrete GPU.
+- Derived: performance per watt and temperature behaviour. Room temperature is recorded with every run.
+
+### Repeats
+
+- Each profile × workload combination is repeated five times in the pilot.
+- Repeats show run-to-run variation, so a real profile effect can be told apart from noise in a single run. Five is the minimum that gives a usable spread within the time available; Sprint 2 increases it.
+
+### Run order
+
+- A **block** is one boot with one CPU profile. Inside each block, every workload (and later, every GPU cap) runs once, in a shuffled order.
+- Profiles are interleaved, never run all-of-one-then-the-next. With three profiles A, B and C, the pilot uses the order ABC CBA ABC CBA ABC (15 blocks), so each profile gets as many early slots as late ones.
+- Room temperature is recorded with every run using a thermometer.
+- Interleaving and shuffling reduce confounding from time of day, room-temperature drift and workload order.
+
+### Pilot size and time
+
+- 3 CPU profiles × 2 workloads × 5 repeats = 30 runs, in 15 blocks (5 per profile).
+- Each run takes up to 7 minutes (1 min warm-up + 3 min workload + up to 3 min cooldown), so a block takes about 14 minutes.
+- 14 profile switches × about 2 minutes = 28 minutes.
+- Total: 30 × 7 + 14 × 2 = 238 minutes, about 4 hours, not counting setup or problems. The operator must be present for a BIOS switch about every 14 minutes.
+
 ## 6. Measurement
 
 ### Sources
