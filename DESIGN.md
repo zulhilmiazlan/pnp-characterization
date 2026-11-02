@@ -13,6 +13,34 @@ This project investigates how CPU power limits, AMD Curve Optimizer undervolting
 - **RQ3:** How differently do CPU-bound, cache-sensitive, GPU, and AI inference workloads respond to the same power limit?
 - **RQ4:** Can unsupervised anomaly detection identify telemetry patterns associated with unstable undervolting, thermal throttling, or sensor faults before a crash or obvious failure?
 
+## 2. Scope
+
+### In scope
+
+- One desktop system: the Ryzen 7 7800X3D and Radeon RX 9070 XT described in section 3. Results apply to this tested unit and its recorded configuration.
+- CPU settings: package power limit (PPT) and AMD Curve Optimizer undervolting profiles, selected in the BIOS. GPU setting: power cap, set by the framework through sysfs.
+- CPU-bound, cache-sensitive, GPU and AI inference workloads, with performance, power, energy efficiency and temperature measured during each run.
+- CachyOS Linux, using the CPU and GPU telemetry available through sysfs.
+- Unsupervised anomaly detection on the collected telemetry, focused on unstable undervolts and thermal throttling, evaluated against recorded events (crashes, rasdaemon hardware errors, throttling).
+
+### Held fixed
+
+- The same physical desktop, CPU, GPU, motherboard and memory are used throughout.
+- Memory stays at its DDR5-6000 EXPO profile. Memory timings and frequency are not experimental variables.
+- BIOS version and all other BIOS settings stay unchanged within an experiment batch, apart from the power-limit and Curve Optimizer profile being tested.
+- CPU and case fan curves (BIOS) are unchanged across runs, so cooling behaves by the same rules in every run.
+- The integrated Radeon 610M's state (enabled or disabled) is decided in the first desktop session, then held fixed and recorded. The discrete RX 9070 XT is the GPU under test.
+- Operating system, kernel, graphics driver, workload versions and relevant software settings are kept the same within each comparison and recorded with the run data.
+
+### Out of scope
+
+- Generalising to every Ryzen 7 7800X3D or RX 9070 XT. Because of unit-to-unit variation, other samples may reach different undervolts, temperatures or performance.
+- Comparing different CPU or GPU models. This is a controlled characterization of one desktop, not a benchmark across products.
+- Windows. Windows 11 is installed on the same machine but is not used for measurements; the framework and all experiments are Linux-only.
+- Laboratory-grade external power measurement. The project uses on-chip telemetry and focuses on relative comparisons within the tested system.
+- Raising CPU or GPU voltages above stock, or overclocking. Only power limits and undervolting are explored, to avoid voltage-related damage.
+- Changing BIOS settings automatically. Power-limit and Curve Optimizer profiles are selected by hand in the BIOS; the framework records and checks the declared profile.
+
 ## 3. System under test
 
 | Component | Detail |
