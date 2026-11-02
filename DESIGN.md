@@ -142,6 +142,58 @@ Development machine and optional second platform: Lenovo ThinkPad (Intel Core i5
 - **Background activity:** other applications are closed during experiment batches. Each configuration is repeated at least five times, and the spread between repeats is reported.
 - **Observer effect:** the sampler's own power cost is not yet measured. Planned test: compare idle power sampled at 1 Hz and at 10 Hz. It matters mainly for idle measurements and is small next to a full workload.
 
+## 7. Data format
+
+### Run ID
+
+- Format: `<start time>_<CPU profile>_<workload>_r<repeat>`, e.g. `20261115T091230_stock_cpu-matrix_r03`.
+- The start time is local time (UTC+8; Malaysia has no daylight saving), written as `YYYYMMDDTHHMMSS` so that folder names sort in time order.
+- The start time makes the ID unique: the orchestrator runs one thing at a time, so no two runs start in the same second. The profile, workload and repeat number make it readable at a glance.
+- A run folder is created with `os.makedirs(path, exist_ok=False)`, so an existing folder is never reused or overwritten.
+
+### Run folder layout
+
+```text
+runs/
+  <run_id>/
+    run.json        what was asked for (configuration and conditions)
+    telemetry.csv   sampler output (section 6)
+    workload.txt    the workload's own output, unedited
+    result.json     what happened: score, exit status, start and end times
+    events.log      timestamped phases: warm-up, workload start/end, cooldown end, errors
+  state/
+    <block_id>/     capture_state.sh snapshot, taken once per block (boot)
+analysis/           derived results; reads runs/, never writes to it
+```
+
+- The machine snapshot is taken once per block rather than once per run, because it is slow and the machine state does not change within one boot. Each `run.json` names its block.
+
+### run.json fields
+
+| Field | Example |
+|---|---|
+| `run_id` | `20261115T091230_stock_cpu-matrix_r03` |
+| `block_id` | `20261115T090500_stock` |
+| `cpu_profile` | `stock` (declared by the operator; checked against the snapshot) |
+| `workload` | `cpu-matrix`, plus its parameters |
+| `gpu_cap_w` | `null` when not set |
+| `repeat` | `3` |
+| `position_in_block` | `1` |
+| `room_temp_c` | `24.5` |
+| `sample_rate_hz` | `10` |
+| `framework_commit` | git commit hash of this repository when the run started |
+
+### result.json fields
+
+`score`, `score_unit`, `exit_status`, `start_time`, `end_time`, `duration_s` (times in ISO 8601, e.g. `2026-11-15T09:12:30+08:00`).
+
+### Rules
+
+- A run folder is never changed after its run ends.
+- Analysis reads `runs/` and writes only to `analysis/`.
+- Missing values are `NA` in CSV files and `null` in JSON files, never zero.
+- A failed or crashed run keeps its folder. Its exit status and `events.log` record what happened (crash = data, section 9).
+
 ## 9. Risks and known issues
 
 | Risk | Effect | How the project handles it |
