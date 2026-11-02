@@ -47,6 +47,37 @@ Development machine and optional second platform: Lenovo ThinkPad (Intel Core i5
 | **Result store** | The unique run ID, configuration, machine snapshot, raw telemetry CSV, and workload result. | A persistent, immutable run directory containing all artefacts needed to reproduce the analysis and compare experiments later. |
 | **Analysis** | The saved run directories, raw telemetry, workload performance results, configuration, and comparison criteria. | Derived metrics such as average power, energy consumption, performance per watt, temperature behaviour, plus run-to-run variance per configuration and whether configurations are distinguishable (spread within a configuration smaller than the difference between configurations), presented as reports and plots, without modifying the original run data. |
 
+## 6. Measurement
+
+### Sources
+
+- CPU package energy is read from RAPL through `energy_uj`. CPU temperature is read from the `coretemp` (laptop) or `k10temp` (desktop) hwmon device.
+- Desktop GPU power is read from amdgpu's `power1_average`. GPU temperatures are read from `temp1` (edge), `temp2` (junction) and `temp3` (memory).
+- GPU sensor reads fail with "Device or resource busy" (`EBUSY`) while the GPU is runtime-suspended. These readings are recorded as `NA`, not zero (casebook 001).
+
+### Sampling rate
+
+- The sampler takes 10 readings per second (one every 0.1 s). This shows events lasting about 0.1 s or longer, such as a 7 W spike seen during laptop testing. Shorter events are averaged into their 0.1 s interval.
+- The laptop RAPL counter has a range of 262,143 J and wraps after about 48 minutes at 90 W. At 10 readings per second there are about 28,800 readings per wrap, so a complete wrap between two readings cannot happen in practice. The desktop counter range is still to be measured.
+- At 1 Hz, short power spikes would be averaged away. At 100 Hz or more, Python and `fsync` overhead would grow (a stronger observer effect) and the data would be about 10 times larger.
+
+### Power calculation
+
+- Average power between consecutive readings = energy difference (µJ converted to J) ÷ the actual elapsed time in seconds.
+- Counter wraps are handled using `max_energy_range_uj`. Only one wrap between consecutive readings is supported; more than one cannot be detected from two readings.
+- If either energy reading is unavailable, power is recorded as `NA`. The current code updates the previous reading on every pass, even when it is unavailable, so one failed energy reading gives two consecutive `NA` power rows.
+
+### Failed readings
+
+- Missing or failed readings are recorded as `NA`, never zero, so that unavailable data cannot be mistaken for a real zero.
+- *Planned (v1):* the error type (e.g. `EBUSY`) is also recorded, so missing data can be investigated later.
+
+### Measurement reliability
+
+- **Settling:** the warm-up period before each run is not used in the reported results, so the measurements describe the steady state rather than the settling after a change.
+- **Background activity:** other applications are closed during experiment batches. Each configuration is repeated at least five times, and the spread between repeats is reported.
+- **Observer effect:** the sampler's own power cost is not yet measured. Planned test: compare idle power sampled at 1 Hz and at 10 Hz. It matters mainly for idle measurements and is small next to a full workload.
+
 ## 9. Risks and known issues
 
 | Risk | Effect | How the project handles it |
