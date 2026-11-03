@@ -194,6 +194,46 @@ analysis/           derived results; reads runs/, never writes to it
 - Missing values are `NA` in CSV files and `null` in JSON files, never zero.
 - A failed or crashed run keeps its folder. Its exit status and `events.log` record what happened (crash = data, section 9).
 
+## 8. Quality checks
+
+After each run, the orchestrator checks it and writes a status, plus the reason for any failed check, to `result.json`. Raw data is never changed or deleted.
+
+### Run status
+
+| Status | Meaning | Use in analysis |
+|---|---|---|
+| `ok` | The run completed and every check passed | Used everywhere |
+| `unstable` | The hardware failed: crash, unexpected reboot or a new hardware error | Kept for RQ4 and counted per configuration. Left out of performance and perf/W averages, which need a completed score |
+| `invalid` | The measurement failed: the data or the starting conditions cannot be trusted | Left out everywhere; the number of runs excluded and the reasons are reported |
+
+A crash is a result, not bad data: removing unstable runs would hide the behaviour RQ4 investigates. An `unstable` run at **stock** settings is treated differently, because stock is expected to be stable; it points to a system problem and is investigated separately (casebook).
+
+### Checks that mark a run `invalid`
+
+| Check | Initial threshold | Reason |
+|---|---|---|
+| Telemetry missing | `telemetry.csv` missing or has no readings | Nothing to analyse |
+| Timestamps | Not strictly increasing | The sampler or clock misbehaved |
+| Reading gap | Any gap between readings > 0.5 s | At 10 Hz, that is at least five missed readings |
+| Missing energy | > 5% of CPU energy readings are `NA` | Allows occasional failures, not runs with substantial missing data |
+| Hot start | CPU temperature at start > 5 °C above the session's idle baseline | Cooldown did not finish; thermal history would bias the run |
+| Not quiet | Mean CPU package power over the 10 s before warm-up > 3 W above the idle baseline | Background activity would add to the measured power |
+| Profile mismatch | Measured behaviour contradicts the declared profile (e.g. package power well above the declared PPT), or BIOS version differs from the batch | The run did not use the configuration it claims |
+| GPU cap mismatch | Cap read back from sysfs differs from the configured value | Same as above |
+| Missing metadata | `run.json` lacks room temperature or the framework commit | The run cannot be interpreted or traced to its code |
+
+Curve Optimizer offsets cannot be read back from Linux, so the CO profile can only be declared, not verified (section 4).
+
+### Checks that mark a run `unstable`
+
+- The workload crashes or exits with a non-zero status without producing a score.
+- The machine reboots during the run. This is detected at the next start: a run whose `events.log` has no "workload end" entry is marked `unstable`, with the time of its last reading.
+- rasdaemon records a new hardware error during the run.
+
+### Thresholds are provisional
+
+All thresholds are initial values for the pilot. After the pilot, they are reviewed against the observed distributions and changed if needed, with the change recorded in this document. The "not quiet" threshold comes from laptop measurements (idle about 1.5–3 W); the desktop idles much higher, so it will be reset from the desktop's idle baseline in the first desktop session, possibly as a percentage instead of a fixed number of watts.
+
 ## 9. Risks and known issues
 
 | Risk | Effect | How the project handles it |
