@@ -243,3 +243,15 @@ All thresholds are initial values for the pilot. After the pilot, they are revie
 | An unstable Curve Optimizer undervolt crashes the machine | A run ends early; data may be lost | Treat crashes as experimental data. Write each telemetry row to disk immediately (flushed), so data up to the moment of the crash survives. Record run metadata, and use `rasdaemon` to monitor and preserve relevant hardware error records where available. After reboot, inspect the logs and mark the interrupted run as failed rather than discarding it silently. |
 | Room temperature is not controlled at home | Hotter days give higher temperatures and possibly lower boost | Record ambient room temperature alongside each run, using a thermometer if available, and compare results with environmental conditions noted. Run a baseline configuration (stock) at the start of each session to detect drift between sessions. |
 | Clock-speed readings are snapshots (DVFS, C-states) | A single reading misrepresents the actual speed | Avoid relying on individual `scaling_cur_freq` readings. Use time-series samples and workload performance measurements; use performance counters such as `perf stat` where appropriate to provide additional aggregate context. |
+
+## 10. Open decisions
+
+| Decision | Options | Decided when |
+|---|---|---|
+| `stress-ng` workloads | Two CPU stressors: one compute-bound, one cache/memory-sensitive | Wed 4 Nov, when the workload driver is built |
+| Cooldown target and timeout | Cool until CPU temperature is within a few °C of idle; give up after a fixed timeout | Fri 6 Nov, when the orchestrator is built; checked in the first desktop batch |
+| iGPU configuration | Enabled (recorded) or disabled in the BIOS | Sat 7 Nov, first desktop session; then held fixed (section 2) |
+| Desktop RAPL counter range | Read from `max_energy_range_uj`; work out the wrap time at full load | Sat 7 Nov, first desktop session |
+| Desktop idle baseline | Measure idle package power and temperature; set the "not quiet" threshold in watts or as a percentage | Sat 7 Nov, before any pilot run is judged (section 8) |
+| Room temperature measurement | Cheap digital thermometer now; a BME280 sensor on the Project B board later | Thermometer bought before Sun 8 Nov (first batch) |
+| GPU power cap levels | Stock 304 W plus lower steps | Block B (14–29 Nov), before the GPU batch |
