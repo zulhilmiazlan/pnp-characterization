@@ -4,14 +4,14 @@ Drafted 2026-10-28. Work in progress: sections are added as decisions are made.
 
 ## 1. Goal
 
-This project investigates how CPU power limits, AMD Curve Optimizer undervolting profiles, and GPU power caps affect performance, power consumption, energy efficiency, and temperature on a Ryzen 7 7800X3D and RX 9070 XT desktop running Linux, across CPU-bound, cache-sensitive, GPU, and AI inference workloads. It also explores whether machine learning can detect abnormal hardware behaviour, such as instability, thermal throttling, and sensor faults, from telemetry collected during experiments.
+This project investigates how CPU power limits, AMD Curve Optimizer undervolting profiles, and GPU power caps affect performance, power consumption, energy efficiency, and temperature on a Ryzen 7 7800X3D and RX 9070 XT desktop running Linux, across CPU-bound, cache-sensitive, GPU, and AI inference workloads. It also explores whether machine learning can detect abnormal hardware behaviour, such as instability and thermal throttling from telemetry collected during experiments.
 
 ### Research questions
 
 - **RQ1:** At what CPU power limit does performance per watt peak, and how does performance at that point compare with stock settings?
 - **RQ2:** Does Curve Optimizer undervolting improve sustained performance by reducing temperature, rather than merely reducing power consumption?
 - **RQ3:** How differently do CPU-bound, cache-sensitive, GPU, and AI inference workloads respond to the same power limit?
-- **RQ4:** Can unsupervised anomaly detection identify telemetry patterns associated with unstable undervolting, thermal throttling, or sensor faults before a crash or obvious failure?
+- **RQ4:** Can unsupervised anomaly detection identify telemetry patterns associated with unstable undervolting or thermal throttling before a crash or obvious failure?
 
 ## 2. Scope
 
@@ -255,3 +255,44 @@ All thresholds are initial values for the pilot. After the pilot, they are revie
 | Desktop idle baseline | Measure idle package power and temperature; set the "not quiet" threshold in watts or as a percentage | Sat 7 Nov, before any pilot run is judged (section 8) |
 | Room temperature measurement | Cheap digital thermometer now; a BME280 sensor on the Project B board later | Thermometer bought before Sun 8 Nov (first batch) |
 | GPU power cap levels | Stock 304 W plus lower steps | Block B (14–29 Nov), before the GPU batch |
+
+## 11. Anomaly detection (RQ4)
+
+### Approach
+
+- An unsupervised detector learns what normal telemetry looks like from runs at stable settings, then flags readings that do not fit. It is never trained on examples labelled as failures.
+- The model itself is chosen in Semester 2. This section fixes how it will be **evaluated**, so that the data collected from Block B onwards can support that evaluation.
+
+### Ground truth events
+
+Recorded events are used to evaluate the detector, never to train it. Each event needs an exact time.
+
+| Event | Source | Time taken from |
+|---|---|---|
+| Crash or unexpected reboot | Run without a "workload end" entry in `events.log` (section 8) | Time of the last telemetry reading |
+| Hardware error | rasdaemon (corrected and uncorrected errors) | rasdaemon's own timestamp |
+| Wrong result | Workload's built-in result check (e.g. `stress-ng --verify`) reports a mismatch | Time in `workload.txt` / `events.log` |
+| Thermal throttling | Clock speed falls while temperature is at its limit (exact definition fixed with the desktop data) | Telemetry timestamp |
+
+- Telemetry times are seconds since the run started (`t_s`). Adding the run's start time from `result.json` converts them to clock time, so they can be matched with rasdaemon's timestamps.
+- A wrong result without a crash is the closest this project gets to silent data corruption, so these events are reported separately.
+
+### Creating marginal behaviour
+
+- After the pilot, Curve Optimizer is stepped further negative from the last stable level in steps of 5 (e.g. −30, −35, −40, …), running the workloads several times at each step.
+- Stepping, rather than jumping to an extreme value, records the transition from stable to marginal behaviour. An extreme value may crash at once, leaving no telemetry from before the failure.
+- Stepping stops at the first level that crashes repeatedly. That level and the one before it are the marginal region of most interest.
+- Safety: only undervolting (lower voltage than stock) is used; telemetry is flushed to disk row by row (section 6); the BIOS can be reset by clearing CMOS if a setting does not boot.
+
+### Matching alerts to events
+
+- An alert is a **correct warning** if it comes up to 60 s before an event (initial window; reviewed after the first unstable runs).
+- An event with no alert in its window is a **missed event**. An alert with no event in the following 60 s is a **false alarm**. Alerts after an event in the same run are ignored.
+- **No look-ahead:** when the detector judges time *t*, it may only use readings from time *t* or earlier, even though analysis runs after the batch on saved files.
+
+### Evaluation
+
+- For each detector, report together: events caught (out of the total), false alarms per hour of telemetry, and lead time (how long before each event the warning came).
+- The ML detector is compared with simple baseline rules on the same data and the same matching window, e.g. "alert if CPU temperature > 85 °C". Comparisons are made at a similar false-alarm rate, because any detector can catch more events by alerting more often.
+- If a simple rule does as well as the ML detector, that is reported as the finding: the project measures whether ML adds value, not that it does.
+- Crashes are rare, so event counts will be small. Results are reported as counts (e.g. "4 of 5"), not only as percentages, and are not generalised beyond this machine (section 2).
