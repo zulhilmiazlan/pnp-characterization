@@ -248,7 +248,7 @@ All thresholds are initial values for the pilot. After the pilot, they are revie
 
 | Decision | Options | Decided when |
 |---|---|---|
-| `stress-ng` workloads | Two CPU stressors: one compute-bound, one cache/memory-sensitive | Wed 4 Nov, when the workload driver is built |
+| `stress-ng` workloads | **Decided 4 Nov:** `cpu --cpu-method matrixprod` (compute-bound) and `stream` (memory-sensitive; buffers sized from the last-level cache). Both verify their results (`stress-ng --verifiable`). `cache` and `memrate` rejected: no verification, so they report "passed" without checking | Done (`workload.py`) |
 | Cooldown target and timeout | Cool until CPU temperature is within a few °C of idle; give up after a fixed timeout | Fri 6 Nov, when the orchestrator is built; checked in the first desktop batch |
 | iGPU configuration | Enabled (recorded) or disabled in the BIOS | Sat 7 Nov, first desktop session; then held fixed (section 2) |
 | Desktop RAPL counter range | Read from `max_energy_range_uj`; work out the wrap time at full load | Sat 7 Nov, first desktop session |
