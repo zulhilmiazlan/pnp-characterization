@@ -46,6 +46,20 @@ def find_hwmon(name):
     return None
 
 
+def find_hwmon_on_pci(name, pci_addr):
+    """Return the hwmon folder named `name` whose device is at PCI address `pci_addr`, or None."""
+    for folder in glob.glob("/sys/class/hwmon/hwmon*"):
+        if read_text(folder + "/name") != name:
+            continue
+
+        device_path = os.path.realpath(folder + "/device")
+
+        if pci_addr in device_path.split("/"):
+            return folder
+
+    return None
+
+
 def find_rapl_package():
     """Return the RAPL zone folder named 'package-0', or None."""
     for folder in glob.glob("/sys/class/powercap/intel-rapl:*"):
