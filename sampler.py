@@ -1,4 +1,4 @@
-
+"""Telemetry sampler: read CPU energy and temperature, and optionally GPU power and temperatures, at a fixed rate into a CSV file."""
 """Telemetry sampler v0: read CPU energy and temperature at a fixed rate into a CSV file."""
 
 import argparse
@@ -26,6 +26,11 @@ def read_int(path):
         return int(text)
     except ValueError:
         return None
+
+
+def na(value):
+    """Return `value`, or "NA" if it is None (for CSV output)."""
+    return value if value is not None else "NA"
 
 
 def energy_delta(old, new, max_range):
@@ -68,7 +73,7 @@ def find_rapl_package():
     return None
 
 
-def sample(rapl, temp_dev, rate, duration, out_path):
+def sample(rapl, temp_dev, gpu_dev, rate, duration, out_path):
     """Read the sensors `rate` times per second for `duration` seconds."""
     period = 1.0 / rate
     count = int(duration * rate)
@@ -80,7 +85,10 @@ def sample(rapl, temp_dev, rate, duration, out_path):
 
     with open(out_path, "w", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(["t_s", "energy_uj", "cpu_temp_mc", "power_w"])
+        writer.writerow([
+            "t_s", "energy_uj", "cpu_temp_mc", "power_w",
+            "gpu_power_uw", "gpu_edge_mc", "gpu_junction_mc", "gpu_mem_mc"
+        ])
 
         for i in range(count):
             t = time.monotonic() - start
@@ -89,17 +97,31 @@ def sample(rapl, temp_dev, rate, duration, out_path):
 
             delta_uj = energy_delta(prev_energy, energy, max_range)
 
-            # No power on the first row, or if either energy reading is missing.
             if delta_uj is None:
                 power = None
             else:
                 power = (delta_uj / 1e6) / (t - prev_t)
 
+            if gpu_dev is None:
+                gpu_power = None
+                gpu_edge = None
+                gpu_junction = None
+                gpu_mem = None
+            else:
+                gpu_power = read_int(gpu_dev + "/power1_average")
+                gpu_edge = read_int(gpu_dev + "/temp1_input")
+                gpu_junction = read_int(gpu_dev + "/temp2_input")
+                gpu_mem = read_int(gpu_dev + "/temp3_input")
+
             writer.writerow([
                 f"{t:.3f}",
-                energy if energy is not None else "NA",
-                temp if temp is not None else "NA",
-                f"{power:.2f}" if power is not None else "NA",
+                na(energy),
+                na(temp),
+                na(f"{power:.2f}" if power is not None else None),
+                na(gpu_power),
+                na(gpu_edge),
+                na(gpu_junction),
+                na(gpu_mem),
             ])
 
             f.flush()
@@ -108,14 +130,13 @@ def sample(rapl, temp_dev, rate, duration, out_path):
             prev_energy = energy
             prev_t = t
 
-            # Wait until the next reading is due, counted from the start,
-            # so small delays don't add up.
             next_time = start + (i + 1) * period
             time.sleep(max(0.0, next_time - time.monotonic()))
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Sample CPU energy and temperature into a CSV file.")
+    parser = argparse.ArgumentParser(description="Sample CPU (and optionally GPU) telemetry into a CSV file.")
+    parser.add_argument("--gpu-pci", default=None, help="PCI address of the GPU under test, e.g. 0000:03:00.0")
     parser.add_argument("--rate", type=float, default=10.0, help="readings per second (default 10)")
     parser.add_argument("--duration", type=float, default=5.0, help="seconds to sample (default 5)")
     parser.add_argument("--out", default="telemetry.csv", help="output CSV file")
@@ -128,8 +149,15 @@ def main():
     if temp_dev is None or rapl is None:
         raise SystemExit(f"error: sensors not found (temperature: {temp_dev}, RAPL: {rapl})")
 
-    print(f"Sampling {rapl} and {temp_dev} at {args.rate}/s for {args.duration} s -> {args.out}")
-    sample(rapl, temp_dev, args.rate, args.duration, args.out)
+    # GPU under test is chosen by PCI address, because the iGPU also reports as "amdgpu" (casebook 001).
+    gpu_dev = None
+    if args.gpu_pci:
+        gpu_dev = find_hwmon_on_pci("amdgpu", args.gpu_pci)
+        if gpu_dev is None:
+            raise SystemExit(f"error: amdgpu hwmon not found for PCI address {args.gpu_pci}")
+
+    print(f"Sampling {rapl}, {temp_dev}, GPU: {gpu_dev} at {args.rate}/s for {args.duration} s -> {args.out}")
+    sample(rapl, temp_dev, gpu_dev, args.rate, args.duration, args.out)
 
 
 if __name__ == "__main__":
