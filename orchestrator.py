@@ -3,9 +3,11 @@
 import os
 import subprocess
 import sys
+import time
 from datetime import datetime
 
 import results
+import sampler
 import workload
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -20,6 +22,26 @@ def log_event(run_dir, event):
         f.write(f"{timestamp} {event}\n")
         f.flush()
         os.fsync(f.fileno())
+
+
+def wait_for_cooldown(temp_path, target_mc, timeout_s, poll_s=2.0):
+    """Wait until the temperature in `temp_path` is at or below `target_mc` (millidegrees C), or `timeout_s` passes.
+
+    Return (reached, last_temp_mc, waited_s): reached is True if the target was met before the timeout.
+    """
+    start = time.monotonic()
+
+    while True:
+        temp = sampler.read_int(temp_path)
+        waited = time.monotonic() - start
+
+        if temp is not None and temp <= target_mc:
+            return (True, temp, waited)
+
+        if waited >= timeout_s:
+            return (False, temp, waited)
+
+        time.sleep(poll_s)
 
 
 def run_one(runs_root, block_id, profile, workload_name, repeat, position, room_temp_c,
@@ -54,7 +76,7 @@ def run_one(runs_root, block_id, profile, workload_name, repeat, position, room_
     if gpu_pci:
         cmd += ["--gpu-pci", gpu_pci]
     log_event(run_dir, "sampler start")
-    sampler = subprocess.Popen(cmd)
+    sampler_proc = subprocess.Popen(cmd)
 
     log_event(run_dir, "warm-up start")
     workload.run_workload(workload_name, warmup_s, os.path.join(run_dir, "warmup.txt"))
@@ -62,7 +84,7 @@ def run_one(runs_root, block_id, profile, workload_name, repeat, position, room_
     res = workload.run_workload(workload_name, workload_s, os.path.join(run_dir, "workload.txt"))
     log_event(run_dir, "workload end")
 
-    sampler_exit = sampler.wait()
+    sampler_exit = sampler_proc.wait()
     log_event(run_dir, f"sampler end (exit {sampler_exit})")
     end = datetime.now().astimezone()
 
