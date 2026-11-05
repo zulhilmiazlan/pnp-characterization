@@ -30,19 +30,19 @@ def run_one(runs_root, block_id, profile, workload_name, repeat, position, room_
     run_dir = results.create_run_dir(runs_root, run_id)
 
     run_info = {
-    "run_id": run_id,
-    "block_id": block_id,
-    "cpu_profile": profile,
-    "workload": workload_name,
-    "warmup_s": warmup_s,
-    "workload_s": workload_s,
-    "gpu_cap_w": None,
-    "gpu_pci": gpu_pci,
-    "repeat": repeat,
-    "position_in_block": position,
-    "room_temp_c": room_temp_c,
-    "sample_rate_hz": rate,
-    "framework_commit": results.framework_commit(),
+        "run_id": run_id,
+        "block_id": block_id,
+        "cpu_profile": profile,
+        "workload": workload_name,
+        "warmup_s": warmup_s,
+        "workload_s": workload_s,
+        "gpu_cap_w": None,
+        "gpu_pci": gpu_pci,
+        "repeat": repeat,
+        "position_in_block": position,
+        "room_temp_c": room_temp_c,
+        "sample_rate_hz": rate,
+        "framework_commit": results.framework_commit(),
     }
     results.write_json(os.path.join(run_dir, "run.json"), run_info)
 

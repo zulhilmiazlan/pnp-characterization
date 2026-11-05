@@ -35,12 +35,7 @@ def framework_commit():
         return None
     commit = proc.stdout.strip()
 
-    status = subprocess.run(
-    ["git", "status", "--porcelain"],
-    capture_output=True,
-    text=True,
-    cwd=repo,
-    )
+    status = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True, cwd=repo)
 
     if status.stdout.strip():
         commit += "-dirty"
