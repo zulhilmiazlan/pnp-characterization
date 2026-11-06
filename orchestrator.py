@@ -49,7 +49,7 @@ def wait_for_cooldown(temp_path, target_mc, timeout_s, poll_s=2.0):
 
 
 def run_one(runs_root, block_id, profile, workload_name, repeat, position, room_temp_c,
-            warmup_s, workload_s, rate, gpu_pci=None):
+            warmup_s, workload_s, rate, gpu_pci=None, quiet_s=10):
     """Do one complete run: folder, run.json, sampler in the background, warm-up, workload, result.json."""
     start = datetime.now().astimezone()
     run_id = results.make_run_id(start, profile, workload_name, repeat)
@@ -60,6 +60,7 @@ def run_one(runs_root, block_id, profile, workload_name, repeat, position, room_
         "block_id": block_id,
         "cpu_profile": profile,
         "workload": workload_name,
+        "quiet_s": quiet_s,
         "warmup_s": warmup_s,
         "workload_s": workload_s,
         "gpu_cap_w": None,
@@ -72,15 +73,17 @@ def run_one(runs_root, block_id, profile, workload_name, repeat, position, room_
     }
     results.write_json(os.path.join(run_dir, "run.json"), run_info)
 
-    # Sampler runs in the background for the warm-up and the workload, plus a margin for start-up delays.
+    # Sampler runs in the background for a quiet window, the warm-up and the workload, plus a margin for
+    # start-up delays. The quiet window gives the "not quiet" check (section 8) telemetry from before warm-up.
     margin_s = 10
     cmd = [sys.executable, os.path.join(HERE, "sampler.py"),
-           "--rate", str(rate), "--duration", str(warmup_s + workload_s + margin_s),
+           "--rate", str(rate), "--duration", str(quiet_s + warmup_s + workload_s + margin_s),
            "--out", os.path.join(run_dir, "telemetry.csv")]
     if gpu_pci:
         cmd += ["--gpu-pci", gpu_pci]
     log_event(run_dir, "sampler start")
     sampler_proc = subprocess.Popen(cmd)
+    time.sleep(quiet_s)
 
     log_event(run_dir, "warm-up start")
     workload.run_workload(workload_name, warmup_s, os.path.join(run_dir, "warmup.txt"))
@@ -100,7 +103,6 @@ def run_one(runs_root, block_id, profile, workload_name, repeat, position, room_
         "start_time": start.isoformat(timespec="seconds"),
         "end_time": end.isoformat(timespec="seconds"),
         "duration_s": round((end - start).total_seconds(), 1),
-        "status": "unchecked",  # set by the quality checks (section 8), added later
     }
     results.write_json(os.path.join(run_dir, "result.json"), result)
     return run_dir

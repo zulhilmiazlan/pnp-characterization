@@ -160,6 +160,7 @@ runs/
     telemetry.csv   sampler output (section 6)
     workload.txt    the workload's own output, unedited
     result.json     what happened: score, exit status, start and end times
+    status.json     quality-check result: ok / unstable / invalid, with reasons (section 8)
     events.log      timestamped phases: warm-up, workload start/end, cooldown end, errors
   state/
     <block_id>/     capture_state.sh snapshot, taken once per block (boot)
@@ -196,7 +197,9 @@ analysis/           derived results; reads runs/, never writes to it
 
 ## 8. Quality checks
 
-After each run, the orchestrator checks it and writes a status, plus the reason for any failed check, to `result.json`. Raw data is never changed or deleted.
+After each run, the orchestrator checks it and writes the status, plus the reason for each failed check, to a separate write-once `status.json`. A separate file is used because a crashed run never writes `result.json`: at the start of each block, any run folder without `status.json` is checked, and a run with `run.json` but no `result.json` is marked `unstable` (crash). Raw data is never changed or deleted.
+
+Each run starts with a 10 s quiet window (sampler running, no workload) before the warm-up, so the "not quiet" check has telemetry to judge.
 
 ### Run status
 
