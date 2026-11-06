@@ -10,6 +10,7 @@ import sys
 import time
 from datetime import datetime
 
+import checks
 import results
 import sampler
 import workload
@@ -157,6 +158,11 @@ def main():
         raise SystemExit("error: CPU temperature sensor not found")
     temp_path = temp_dev + "/temp1_input"
 
+    # Runs left without a status by a crash or reboot are checked first (section 8).
+    for run_dir in checks.unchecked_runs(args.runs_root):
+        record = checks.check_and_record(run_dir, args.runs_root)
+        print(f"Checked earlier run {os.path.basename(run_dir)}: {record['status']}")
+
     block_start = datetime.now().astimezone()
     block_id = f"{block_start:%Y%m%dT%H%M%S}_{args.profile}"
     block_dir = results.create_run_dir(os.path.join(args.runs_root, "state"), block_id)
@@ -186,7 +192,9 @@ def main():
         print(f"  cooldown: reached={reached}, {temp} mC after {waited:.0f} s")
         run_dir = run_one(args.runs_root, block_id, args.profile, name, args.repeat, position, args.room_temp,
                           args.warmup, args.duration, args.rate, args.gpu_pci)
-        print(f"  run {position}/{len(order)} done: {run_dir}")
+        record = checks.check_and_record(run_dir, args.runs_root)
+        reasons = record["unstable_reasons"] + record["invalid_reasons"]
+        print(f"  run {position}/{len(order)} {record['status']}: {run_dir}" + (f" ({'; '.join(reasons)})" if reasons else ""))
 
 
 if __name__ == "__main__":

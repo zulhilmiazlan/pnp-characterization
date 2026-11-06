@@ -34,6 +34,27 @@ def test_telemetry_problems():
     assert len(checks.telemetry_problems(both)) == 2, "gap AND backwards timestamp must both be reported"
 
 
+def start_rows(first_temp, quiet_power, n=20):
+    """n rows 0.1 s apart: first CPU temperature `first_temp`, power `quiet_power` throughout (text or "NA")."""
+    out = []
+    for i in range(n):
+        out.append({"t_s": f"{i / 10:.3f}", "cpu_temp_mc": first_temp if i == 0 else "50000",
+                    "power_w": "NA" if i == 0 else quiet_power})
+    return out
+
+
+def test_start_problems():
+    idle_t, idle_p, quiet = 40000, 2.0, 1   # idle 40 C and 2 W; 1 s quiet window (rows with t_s < 1)
+    assert checks.start_problems(start_rows("43000", "4.0"), idle_t, idle_p, quiet) == [], "+3 C, +2 W: fine"
+    assert len(checks.start_problems(start_rows("46000", "4.0"), idle_t, idle_p, quiet)) == 1, "+6 C: hot start"
+    assert len(checks.start_problems(start_rows("43000", "6.0"), idle_t, idle_p, quiet)) == 1, "+4 W: not quiet"
+    assert len(checks.start_problems(start_rows("46000", "6.0"), idle_t, idle_p, quiet)) == 2, "both problems"
+    assert len(checks.start_problems(start_rows("NA", "4.0"), idle_t, idle_p, quiet)) == 1, "no start temp: can't check"
+    assert len(checks.start_problems(start_rows("43000", "NA"), idle_t, idle_p, quiet)) == 1, "no power: can't check"
+    assert len(checks.start_problems(start_rows("43000", "4.0"), idle_t, None, quiet)) == 1, "no idle power baseline"
+
+
 if __name__ == "__main__":
     test_telemetry_problems()
+    test_start_problems()
     print("all checks tests passed")
